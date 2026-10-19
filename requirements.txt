@@ -1,0 +1,7 @@
+transformers
+torch
+nltk
+streamlit
+pypdf
+scikit-learn
+pandas

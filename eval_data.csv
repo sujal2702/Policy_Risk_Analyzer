@@ -1,0 +1,41 @@
+sentence,true_label
+"We may share your personal information with our advertising partners for marketing purposes.",Data Sharing
+"Your data may be sold to third-party companies that conduct market research.",Data Sharing
+"We disclose your contact details and usage data to business partners who offer related services.",Data Sharing
+"Information about your purchases may be provided to affiliated companies and external vendors.",Data Sharing
+"We allow third-party analytics providers to access your browsing activity on our app.",Data Sharing
+"Your account information may be transferred to a buyer if our company is acquired.",Data Sharing
+"Your subscription will renew automatically at the end of each billing cycle unless you cancel.",Auto-Renewal
+"We will charge your saved payment method every year until you turn off auto-renewal.",Auto-Renewal
+"Free trials convert into a paid monthly plan automatically when the trial period ends.",Auto-Renewal
+"Your membership continues and is billed each month until you cancel it in your settings.",Auto-Renewal
+"Cancellation must be done at least 48 hours before the renewal date to avoid being charged.",Auto-Renewal
+"Plans renew for the same duration at the then-current price without further notice.",Auto-Renewal
+"All disputes arising from these terms shall be settled by binding arbitration.",Arbitration
+"You waive your right to bring or join any class action lawsuit against the company.",Arbitration
+"Any claim must be resolved by an independent arbitrator rather than a judge or jury.",Arbitration
+"You agree not to sue the company in court for any matter related to the service.",Arbitration
+"Disagreements will be handled through individual arbitration and not in a court of law.",Arbitration
+"You give up your right to a jury trial for any dispute with us.",Arbitration
+"We may suspend or terminate your account at any time without prior notice.",Account Termination
+"The company reserves the right to close accounts that it believes violate these terms.",Account Termination
+"Your access to the service may be revoked at our sole discretion for any reason.",Account Termination
+"We can disable your profile and delete your content if we suspect misuse.",Account Termination
+"Accounts that remain inactive for twelve months may be permanently deactivated.",Account Termination
+"We may ban users from the platform without giving an explanation.",Account Termination
+"We retain your personal data even after you delete your account.",Data Retention
+"Backup copies of your information may be stored on our servers indefinitely.",Data Retention
+"Your messages are kept for up to five years for legal and business purposes.",Data Retention
+"We store your location history for as long as we consider it necessary.",Data Retention
+"Deleted photos may remain in our archives for an extended period of time.",Data Retention
+"Records of your transactions are preserved for seven years after your last purchase.",Data Retention
+"You must be at least 13 years old to create an account on our platform.",Safe
+"Please keep your password confidential and do not share it with anyone.",Safe
+"You can contact our support team by email if you have any questions.",Safe
+"We may update these terms and will post the new version on this page.",Safe
+"Our app is available on both Android and iOS devices.",Safe
+"You are responsible for the content that you upload to the service.",Safe
+"These terms are written in English and any translation is for convenience only.",Safe
+"We use your listening history to recommend songs you might enjoy.",Safe
+"Users must not upload content that infringes on the copyright of others.",Safe
+"The service may be temporarily unavailable during scheduled maintenance.",Safe
