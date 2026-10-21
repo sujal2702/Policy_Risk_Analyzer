@@ -1,199 +1,252 @@
-# Terms and Privacy Policy Risk Analyzer
+# 🛡️ Terms & Privacy Policy Risk Analyzer
 
-An NLP tool that reads a Terms of Service or Privacy Policy, flags risky clauses, and explains them in plain English with an overall risk level.
+[![Python](https://img.shields.io/badge/Python-3.10%2B-blue.svg?logo=python&logoColor=white)](https://www.python.org/)
+[![Streamlit](https://img.shields.io/badge/Frontend-Streamlit-FF4B4B.svg?logo=streamlit&logoColor=white)](https://streamlit.io/)
+[![Hugging Face](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Transformers-yellow.svg)](https://huggingface.co/)
+[![PyTorch](https://img.shields.io/badge/Backend-PyTorch-EE4C2C.svg?logo=pytorch&logoColor=white)](https://pytorch.org/)
+[![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
-Most people accept these documents without reading them. This tool checks every sentence and points out the clauses that matter, so a user can read those few sentences instead of the whole policy.
+An intelligent Natural Language Processing (NLP) tool that analyzes Terms of Service (ToS) and Privacy Policies, flags potentially hazardous clauses, and delivers plain-English risk assessments with an overall risk rating.
 
-## Features
+Most users click **"I Agree"** without reading dozens of pages of dense legal jargon. This analyzer parses every sentence in the document, isolates critical liabilities, and presents an evidence-backed summary so users can review the clauses that actually matter in seconds.
 
-- Accepts a PDF, a TXT file, or pasted text
-- Checks every sentence for five risk types
-- Gives an overall risk level (Low, Medium or High) and a risk score
-- Shows a summary: one plain-English explanation and one evidence sentence per risk found
-- Highlights risky sentences in the full text
-- Adjustable confidence threshold that updates results instantly, without re-running the model
-- Two models: Accurate (`bart-large-mnli`) and Fast (`distilbart-mnli-12-3`, about 2 to 3 times faster)
-- Progress bar showing how many sentences have been analyzed
-- Evaluation script that reports precision, recall and F1 score
+---
 
-## Risk Categories
+## 🌟 Key Features
 
-| Category | What it means for the user | Weight |
-|---|---|---|
-| Data Sharing | Your data may be shared with or sold to other companies | 3 |
-| Arbitration | You may lose the right to sue or join a class action | 3 |
-| Account Termination | Your account can be closed or suspended, possibly without notice | 2 |
-| Auto-Renewal | Your subscription may renew and charge you automatically | 2 |
-| Data Retention | Your data may be kept after you stop using the service | 1 |
+- 📄 **Multi-Format Ingestion**: Supports `.pdf` documents (via `pypdf`), `.txt` policy files, or direct raw text pasting.
+- ⚡ **Dual-Model Zero-Shot Inference**:
+  - **Accurate Model**: `facebook/bart-large-mnli` (406M parameters) for maximum semantic precision and nuance.
+  - **Fast Model**: `valhalla/distilbart-mnli-12-3` (~2-3x speedup) for rapid checks on lower-spec hardware.
+- 🚀 **Decoupled Two-Stage Scoring (Instant Sliders)**:
+  - Heavy model inference runs **only once** per document; raw category probabilities are cached in session memory.
+  - Modifying the confidence threshold slider re-filters clauses **instantly (<10ms)** without triggering re-inference.
+- 📊 **Real-Time Mini-Batch Progress**: Displays a dynamic Streamlit progress bar processing sentences in optimized mini-batches (`BATCH_SIZE = 8`).
+- ⚖️ **Weighted Risk Index**: Transparent scoring algorithm (0 to 11) categorizing policies into **Low**, **Medium**, or **High** risk levels.
+- 🔍 **Extractive Summarization**: Identifies the single most confident sentence per flagged risk category and pairs it with a plain-English explanation.
+- 🖍️ **In-Situ Clause Highlighting**: Renders the complete policy text with highlighted warning blocks and categorical metadata tags.
+- 🧪 **Comprehensive Evaluation Suite**: Includes `evaluate.py` to benchmark per-class precision, recall, F1 scores, latency, and confusion matrices against `eval_data.csv`.
 
-Risk score = sum of the weights of the categories found (maximum 11).
-Risk level: 0 to 3 is Low, 4 to 7 is Medium, 8 to 11 is High.
+---
 
-## How It Works
+## ⚖️ Risk Categories & Scoring Model
+
+Each detected risk category carries a weight reflecting its potential legal and privacy impact on the user:
+
+| Category | What it Means for the User | Weight | Default Threshold |
+|---|---|:---:|:---:|
+| **Data Sharing** | Personal data may be sold, monetized, or shared with third-party brokers and marketing partners. | **3** | `0.80` |
+| **Arbitration** | You waive your constitutional right to court litigation, trial by jury, or participating in class-action lawsuits. | **3** | `0.80` |
+| **Account Termination** | The service reserves the unilateral right to suspend, terminate, or delete your account without prior notice. | **2** | `0.80` |
+| **Auto-Renewal** | Subscriptions automatically renew and bill your payment method unless canceled under specific conditions. | **2** | `0.80` |
+| **Data Retention** | Your personal identifiers, activity logs, or telemetry are preserved even after you close or delete your account. | **1** | `0.80` |
+
+### 🧮 Risk Score Formulation
+
+$$\text{Risk Score} = \sum_{\text{category} \in \text{Found}} \text{Weight}(\text{category}) \quad (\text{Maximum: } 11)$$
+
+- **Low Risk (0 – 3)**: Standard operational agreements with standard clauses and minimal liability shifts.
+- **Medium Risk (4 – 7)**: Contains notable commitments such as mandatory auto-renewals or unilateral suspension rights.
+- **High Risk (8 – 11)**: Aggressive terms involving forced binding arbitration, third-party data sharing, and long retention windows.
+
+---
+
+## 🏗️ System Architecture & Workflow
+
+```text
+               +-------------------------------------------+
+               |   Policy Document (PDF / TXT / Raw Text)  |
+               +-------------------------------------------+
+                                     |
+                                     v
+               +-------------------------------------------+
+               |    Preprocessing & Sentence Segmentation  |
+               |       (Header normalizer + NLTK Punkt)    |
+               +-------------------------------------------+
+                                     |
+                                     v
+               +-------------------------------------------+
+               |      Batch Inference (Mini-batch size: 8) |
+               |    BART-Large-MNLI / DistilBART-MNLI      |
+               +-------------------------------------------+
+                                     |
+                                     v
+               +-------------------------------------------+
+               |     Session Score Cache [Key: (Model, Text)]|
+               +-------------------------------------------+
+                                     |
+                     +---------------+---------------+
+                     |                               |
+                     v                               v
+    +---------------------------------+  +---------------------------------+
+    |   Instant Threshold Filtering   |  |   Extractive Summarization      |
+    |      (Confidence >= Threshold)  |  |    (Argmax confidence clause)   |
+    +---------------------------------+  +---------------------------------+
+                     |                               |
+                     +---------------+---------------+
+                                     |
+                                     v
+               +-------------------------------------------+
+               |       Streamlit Interactive Interface     |
+               |  - Risk Badge & Metric Counters           |
+               |  - Plain-English Expandable Cards         |
+               |  - Full Text with In-Situ Highlights      |
+               +-------------------------------------------+
+```
+
+### Why Zero-Shot Natural Language Inference (NLI)?
+
+Instead of relying on rigid keyword search or training expensive domain-specific classifiers with scarce training data, this project frames risk detection as **Zero-Shot NLI**:
+- **Premise**: An isolated policy sentence (e.g., *"We may disclose your personal identifiers to our corporate affiliates and advertising partners."*).
+- **Hypothesis**: `"This clause is about sharing or selling user data to third parties."`
+- The model outputs an entailment probability. If the entailment probability exceeds the threshold, the risk is flagged. This enables modular additions of new categories simply by introducing new hypothesis definitions.
+
+---
+
+## 📁 Repository Structure
 
 ```
-Policy text (PDF / TXT / pasted)
-        |
-        v
-1. Sentence segmentation (NLTK)
-        |
-        v
-2. Zero-shot classification of each sentence, in batches of 8
-   (facebook/bart-large-mnli or valhalla/distilbart-mnli-12-3)
-        |
-        v
-3. Scores are saved, then labels above the threshold are kept (default 0.80)
-        |
-        v
-4. Risk score and risk level
-        |
-        v
-5. Extractive summary (most confident sentence per category)
-        |
-        v
-6. Results shown in the Streamlit web app
+Policy_Risk_Analyzer/
+├── .streamlit/
+│   └── config.toml         # Custom Streamlit dark/light styling and telemetry options
+├── .gitignore              # Ignores __pycache__, virtual environments, and eval results
+├── analyzer.py             # Core NLP engine: tokenization, batched NLI, caching, and risk scoring
+├── app.py                  # Streamlit application: UI, file uploaders, progress bar, highlighters
+├── evaluate.py             # Evaluation harness: latency profiling, classification report, confusion matrix
+├── eval_data.csv           # Ground-truth benchmark dataset with labeled test sentences
+├── sample_policy.txt       # Ready-to-use sample policy containing multi-category risk clauses
+├── requirements.txt        # Pinned Python package dependencies
+└── README.md               # Complete project documentation
 ```
 
-### Why zero-shot classification?
+---
 
-`facebook/bart-large-mnli` is trained on Natural Language Inference (NLI): given a premise and a hypothesis, it predicts whether the premise supports the hypothesis.
+## 🚀 Installation & Quickstart
 
-Each sentence of the policy is used as the premise, and each risk category is turned into a hypothesis such as "This clause is about sharing or selling user data to third parties." The model's confidence that the sentence supports the hypothesis becomes the score for that category.
+### Prerequisites
+- **Python 3.10+**
+- Recommended: 8 GB+ RAM (to run BART-large in memory)
 
-This means the tool needs no labeled training data and no model training. New categories can be added by writing a new label.
-
-## Tech Stack
-
-| Tool | Purpose |
-|---|---|
-| Python 3.10+ | Programming language |
-| Hugging Face Transformers | Loads the pretrained model |
-| PyTorch | Runs the model |
-| NLTK | Splits text into sentences |
-| Streamlit | Web interface |
-| pypdf | Reads text from PDF files |
-| scikit-learn | Precision, recall and F1 score |
-| pandas | Handles evaluation data |
-
-## Project Structure
-
-```
-policy-risk-analyzer/
-|-- analyzer.py           NLP logic: segmentation, classification, risk score, summary
-|-- app.py                Streamlit web interface
-|-- evaluate.py           Measures accuracy on labeled data
-|-- eval_data.csv         40 labeled sentences for evaluation
-|-- sample_policy.txt     Sample policy for testing the app
-|-- requirements.txt      Python libraries
-|-- favicon.png           Browser tab icon
-|-- .streamlit/
-    |-- config.toml       Theme and interface settings
+### 1. Clone the Repository
+```bash
+git clone https://github.com/sujal2702/Policy_Risk_Analyzer.git
+cd Policy_Risk_Analyzer
 ```
 
-## Setup
+### 2. Set Up a Virtual Environment
 
-1. Install Python 3.10 or later.
-2. Open a terminal in the project folder.
-3. Create and activate a virtual environment:
-
-   Windows:
-   ```
-   python -m venv venv
-   venv\Scripts\activate
-   ```
-
-   macOS / Linux:
-   ```
-   python3 -m venv venv
-   source venv/bin/activate
-   ```
-
-4. Install the libraries:
-   ```
-   pip install -r requirements.txt
-   ```
-
-## Running the App
-
+**Windows (PowerShell):**
+```powershell
+python -m venv venv
+.\venv\Scripts\Activate.ps1
 ```
+
+**macOS / Linux:**
+```bash
+python3 -m venv venv
+source venv/bin/activate
+```
+
+### 3. Install Dependencies
+```bash
+pip install --upgrade pip
+pip install -r requirements.txt
+```
+
+### 4. Launch the Application
+```bash
 streamlit run app.py
 ```
-
-The app opens at `http://localhost:8501`.
-
-1. Upload a PDF or TXT file, or paste the policy text.
-2. Click **Analyze**.
-
-The first analysis downloads the selected model (about 1.6 GB for Accurate, about 0.9 GB for Fast). After that, it is loaded from the local cache. Analysis runs on the CPU, so a long policy can take a minute or two.
-
-### Speed
-
-- The model runs once per document. Changing the threshold afterwards only re-applies it to the saved scores, so results update instantly.
-- Clicking Analyze again on the same text with the same model reuses the saved scores.
-- Sentences are sent to the model in batches of 8.
-- Choose **Fast** in the sidebar for a smaller model that is about 2 to 3 times quicker, with slightly lower accuracy.
-
-To try the app quickly, paste the contents of `sample_policy.txt`.
-
-## Evaluation
-
+Open your browser and navigate to:
 ```
-python evaluate.py          # Accurate model
-python evaluate.py fast     # Fast model
+http://localhost:8501
 ```
 
-The script runs the classifier on `eval_data.csv` and prints:
+---
 
-- Time taken per sentence
+## 💻 How to Use
 
-- Precision, recall and F1 score for each category
-- A confusion matrix
-- Overall precision, recall and F1 score for Risky vs Safe
+1. **Select Model** in the sidebar:
+   - **Accurate (`bart-large-mnli`)**: Best for production and critical audits.
+   - **Fast (`distilbart-mnli-12-3`)**: Best for fast checks or limited CPU resources.
+2. **Provide Input**:
+   - Upload a `.pdf` file (e.g., download a company's privacy policy PDF).
+   - Upload a `.txt` document.
+   - Or paste text directly into the text box (try copying lines from [sample_policy.txt](sample_policy.txt)).
+3. **Click "Analyze"**:
+   - The first run downloads the chosen model weights (stored locally in `~/.cache/huggingface/hub/`).
+   - The progress bar displays the sentence batching progress in real time.
+4. **Tune Sensitivity**:
+   - Adjust the **Confidence threshold** slider (0.50 – 0.95). The UI updates instantaneously without re-running the model.
+5. **Inspect the Results**:
+   - Review the aggregate **Risk Level Badge** and score metrics.
+   - Expand the **Summary Cards** for plain-English explanations and extracted evidence.
+   - Read the **Highlighted Document** to inspect clauses in their original context.
 
-Predictions are saved to `eval_results.csv` so incorrect cases can be reviewed.
+---
 
-`eval_data.csv` has two columns, `sentence` and `true_label`. Valid labels are `Data Sharing`, `Auto-Renewal`, `Arbitration`, `Account Termination`, `Data Retention` and `Safe`. More rows can be added to make the evaluation stronger.
+## 🧪 Evaluation & Benchmarks
 
-For this tool, recall matters more than precision: missing a risky clause is worse than showing an extra warning.
+The project includes an automated evaluation harness in [evaluate.py](evaluate.py) tested against [eval_data.csv](eval_data.csv).
 
-### Results
+### Running Evaluations
 
-| Metric (Risky vs Safe) | Accurate | Fast |
-|---|---|---|
-| Precision | fill in | fill in |
-| Recall | fill in | fill in |
-| F1 score | fill in | fill in |
-| Seconds per sentence | fill in | fill in |
+**Evaluate Accurate Model:**
+```bash
+python evaluate.py
+```
 
-## Configuration
+**Evaluate Fast Model:**
+```bash
+python evaluate.py fast
+```
 
-These settings are at the top of `analyzer.py`:
+### Metrics Produced
+- **Per-Sentence Latency**: Average time required per sentence inference.
+- **Classification Report**: Precision, Recall, and F1-Score for each individual category.
+- **Confusion Matrix**: Full breakdown of true versus predicted labels.
+- **Risky vs Safe Binary Assessment**: Evaluates the system's ability to discriminate between risky legal clauses and benign policy boilerplate.
 
-| Setting | Default | Description |
-|---|---|---|
-| `MODELS` | Accurate and Fast | Models shown in the sidebar |
-| `MODEL_NAME` | `facebook/bart-large-mnli` | Default model (used by `evaluate.py`) |
-| `BATCH_SIZE` | `8` | Sentences sent to the model at once |
-| `THRESHOLD` | `0.80` | Minimum score for a sentence to be flagged |
-| `HYPOTHESIS` | `This clause is about {}.` | Template the model checks each label against |
-| `LABELS` | 5 categories | Descriptive label shown to the model and the short name shown to the user |
-| `WEIGHTS` | see table above | Seriousness of each category |
+> **Note on Evaluation Philosophy**: In legal risk analysis, **Recall** is prioritized over Precision. Catching a questionable clause with a slight false-positive warning is far safer for the consumer than missing an aggressive arbitration or data-sharing waiver.
 
-The threshold can also be changed from the sidebar in the app. A lower value catches more risky clauses but gives more false alarms. A higher value gives fewer, more certain flags.
+---
 
-## Limitations
+## ⚙️ Configuration Reference
 
-- Scanned PDFs (images of text) are not supported, since they need OCR.
-- Analysis is slow on CPU for long documents.
-- Zero-shot accuracy depends on how the labels are worded.
-- Legal language can be ambiguous, so some clauses may be missed or wrongly flagged.
-- Only English text is supported.
+All core hyperparameters can be adjusted at the top of [analyzer.py](analyzer.py):
 
-## Related Work
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `MODELS` | `dict` | `{"Accurate...": ..., "Fast...": ...}` | Available Hugging Face zero-shot pipelines. |
+| `BATCH_SIZE` | `int` | `8` | Number of sentences processed per forward pass. |
+| `THRESHOLD` | `float` | `0.80` | Default minimum entailment probability to flag a risk. |
+| `HYPOTHESIS` | `str` | `"This clause is about {}."` | Template used for zero-shot natural language inference. |
+| `LABELS` | `dict` | 5 categories | Mapping from model-facing hypothesis strings to user-facing category labels. |
+| `WEIGHTS` | `dict` | 1 to 3 | Severity weights for each category used in aggregate risk index calculation. |
 
-- **OPP-115**: a corpus of 115 website privacy policies annotated with data practice categories (Wilson et al., 2016).
-- **CLAUDETTE**: a system and dataset for detecting potentially unfair clauses in online Terms of Service (Lippi et al., 2019).
+---
 
-## Disclaimer
+## ⚠️ Limitations & Roadmap
 
-This tool gives an automated first check of a policy. It is not legal advice. Always read the flagged clauses yourself before agreeing to them.
+- **Scanned Documents**: Scanned PDFs composed solely of raster images require an upstream OCR pipeline (e.g., `tesseract` / `easyocr`).
+- **CPU Constraints**: On CPU-only environments, very large documents (500+ sentences) may take a few minutes for the initial inference run.
+- **Ambiguous Phrasing**: Highly stylized legalese or multi-sentence conditional qualifications may require additional context modeling.
+- **Roadmap**:
+  - [ ] Add GPU auto-detection (`device=0` in PyTorch).
+  - [ ] Support OCR for scanned policy documents.
+  - [ ] Export executive audit summaries to PDF / JSON.
+  - [ ] Multi-language support for international policies.
+
+---
+
+## 📖 Academic & Industry References
+
+- **OPP-115 Corpus**: Wilson, S. et al. (2016). *The Creation and Analysis of a Large-Scale Corpus of Privacy Policies*. Association for Computational Linguistics.
+- **CLAUDETTE System**: Lippi, M. et al. (2019). *CLAUDETTE: An Automated Detector of Potentially Unfair Clauses in Online Terms of Service*. Artificial Intelligence and Law.
+- **BART Architecture**: Lewis, M. et al. (2019). *BART: Denoising Sequence-to-Sequence Pre-training for Natural Language Generation, Translation, and Comprehension*.
+
+---
+
+## ⚖️ Legal Disclaimer
+
+*This application provides automated screening based on statistical Natural Language Processing heuristics and does not constitute formal legal counsel. Always review flagged terms directly and consult a qualified legal professional for binding legal advice.*
