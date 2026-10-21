@@ -11,7 +11,9 @@ Most people accept these documents without reading them. This tool checks every 
 - Gives an overall risk level (Low, Medium or High) and a risk score
 - Shows a summary: one plain-English explanation and one evidence sentence per risk found
 - Highlights risky sentences in the full text
-- Adjustable confidence threshold
+- Adjustable confidence threshold that updates results instantly, without re-running the model
+- Two models: Accurate (`bart-large-mnli`) and Fast (`distilbart-mnli-12-3`, about 2 to 3 times faster)
+- Progress bar showing how many sentences have been analyzed
 - Evaluation script that reports precision, recall and F1 score
 
 ## Risk Categories
@@ -36,10 +38,11 @@ Policy text (PDF / TXT / pasted)
 1. Sentence segmentation (NLTK)
         |
         v
-2. Zero-shot classification of each sentence (facebook/bart-large-mnli)
+2. Zero-shot classification of each sentence, in batches of 8
+   (facebook/bart-large-mnli or valhalla/distilbart-mnli-12-3)
         |
         v
-3. Keep labels scoring above the threshold (default 0.80)
+3. Scores are saved, then labels above the threshold are kept (default 0.80)
         |
         v
 4. Risk score and risk level
@@ -121,17 +124,27 @@ The app opens at `http://localhost:8501`.
 1. Upload a PDF or TXT file, or paste the policy text.
 2. Click **Analyze**.
 
-The first analysis downloads the model (about 1.6 GB). After that, it is loaded from the local cache. Analysis runs on the CPU, so a long policy can take a minute or two.
+The first analysis downloads the selected model (about 1.6 GB for Accurate, about 0.9 GB for Fast). After that, it is loaded from the local cache. Analysis runs on the CPU, so a long policy can take a minute or two.
+
+### Speed
+
+- The model runs once per document. Changing the threshold afterwards only re-applies it to the saved scores, so results update instantly.
+- Clicking Analyze again on the same text with the same model reuses the saved scores.
+- Sentences are sent to the model in batches of 8.
+- Choose **Fast** in the sidebar for a smaller model that is about 2 to 3 times quicker, with slightly lower accuracy.
 
 To try the app quickly, paste the contents of `sample_policy.txt`.
 
 ## Evaluation
 
 ```
-python evaluate.py
+python evaluate.py          # Accurate model
+python evaluate.py fast     # Fast model
 ```
 
 The script runs the classifier on `eval_data.csv` and prints:
+
+- Time taken per sentence
 
 - Precision, recall and F1 score for each category
 - A confusion matrix
@@ -145,11 +158,12 @@ For this tool, recall matters more than precision: missing a risky clause is wor
 
 ### Results
 
-| Metric (Risky vs Safe) | Value |
-|---|---|
-| Precision | fill in after running evaluate.py |
-| Recall | fill in after running evaluate.py |
-| F1 score | fill in after running evaluate.py |
+| Metric (Risky vs Safe) | Accurate | Fast |
+|---|---|---|
+| Precision | fill in | fill in |
+| Recall | fill in | fill in |
+| F1 score | fill in | fill in |
+| Seconds per sentence | fill in | fill in |
 
 ## Configuration
 
@@ -157,7 +171,9 @@ These settings are at the top of `analyzer.py`:
 
 | Setting | Default | Description |
 |---|---|---|
-| `MODEL_NAME` | `facebook/bart-large-mnli` | Zero-shot model |
+| `MODELS` | Accurate and Fast | Models shown in the sidebar |
+| `MODEL_NAME` | `facebook/bart-large-mnli` | Default model (used by `evaluate.py`) |
+| `BATCH_SIZE` | `8` | Sentences sent to the model at once |
 | `THRESHOLD` | `0.80` | Minimum score for a sentence to be flagged |
 | `HYPOTHESIS` | `This clause is about {}.` | Template the model checks each label against |
 | `LABELS` | 5 categories | Descriptive label shown to the model and the short name shown to the user |

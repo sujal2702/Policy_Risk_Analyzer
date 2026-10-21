@@ -25,9 +25,15 @@ from nltk.tokenize import sent_tokenize  # noqa: E402
 # ---------------------------------------------------------------------------
 # 2. Settings
 # ---------------------------------------------------------------------------
-MODEL_NAME = "facebook/bart-large-mnli"   # pretrained NLI model (no training needed)
+# Pretrained NLI models (no training needed). "Fast" is smaller, about 2-3x faster.
+MODELS = {
+    "Accurate (bart-large-mnli)": "facebook/bart-large-mnli",
+    "Fast (distilbart-mnli-12-3)": "valhalla/distilbart-mnli-12-3",
+}
+MODEL_NAME = MODELS["Accurate (bart-large-mnli)"]
 THRESHOLD = 0.80                           # min score to flag a sentence as risky
 HYPOTHESIS = "This clause is about {}."    # sentence the model checks against
+BATCH_SIZE = 8                             # sentences sent to the model at once
 
 # Descriptive label (what the model sees) -> short category name (what the user sees)
 LABELS = {
@@ -61,9 +67,9 @@ EXPLAIN = {
 # ---------------------------------------------------------------------------
 # 3. Load the model
 # ---------------------------------------------------------------------------
-def load_classifier():
+def load_classifier(model_name=MODEL_NAME):
     """Download (first time) and load the zero-shot classifier."""
-    return pipeline("zero-shot-classification", model=MODEL_NAME)
+    return pipeline("zero-shot-classification", model=model_name)
 
 
 # ---------------------------------------------------------------------------
@@ -92,33 +98,60 @@ def split_sentences(text, min_words=6):
 # ---------------------------------------------------------------------------
 # 5. Zero-shot classification
 # ---------------------------------------------------------------------------
-def classify_sentences(classifier, sentences, threshold=THRESHOLD):
+def score_sentences(classifier, sentences, batch_size=BATCH_SIZE, progress=None):
     """
+    Runs the model ONCE and keeps every label's score, so the threshold can be
+    changed later without running the model again.
+
+    Returns one dict per sentence:
+        {"sentence": str, "scores": {category: score, ...}}
+    'progress' is an optional function called as progress(done, total).
+    """
+    scored = []
+    total = len(sentences)
+    for start in range(0, total, batch_size):
+        chunk = sentences[start:start + batch_size]
+        results = classifier(
+            chunk,
+            candidate_labels=list(LABELS.keys()),
+            hypothesis_template=HYPOTHESIS,
+            multi_label=True,               # score each label independently
+            batch_size=batch_size,          # process several pairs at once
+        )
+        if isinstance(results, dict):       # a single sentence returns a dict
+            results = [results]
+        for sentence, res in zip(chunk, results):
+            scores = {
+                LABELS[label]: round(score, 3)
+                for label, score in zip(res["labels"], res["scores"])
+            }
+            scored.append({"sentence": sentence, "scores": scores})
+        if progress:
+            progress(min(start + batch_size, total), total)
+    return scored
+
+
+def apply_threshold(scored, threshold=THRESHOLD):
+    """
+    Turns raw scores into flags (no model needed, so this is instant).
     Returns one dict per sentence:
         {"sentence": str, "categories": [(category, score), ...]}
-    'categories' is empty when the sentence is safe.
+    'categories' is sorted by score and is empty when the sentence is safe.
     """
-    if not sentences:
-        return []
-
-    results = classifier(
-        sentences,                          # passing a list = faster than a loop
-        candidate_labels=list(LABELS.keys()),
-        hypothesis_template=HYPOTHESIS,
-        multi_label=True,                   # score each label independently
-    )
-    if isinstance(results, dict):           # a single sentence returns a dict
-        results = [results]
-
     output = []
-    for sentence, res in zip(sentences, results):
-        flagged = [
-            (LABELS[label], round(score, 3))
-            for label, score in zip(res["labels"], res["scores"])
-            if score >= threshold
-        ]
-        output.append({"sentence": sentence, "categories": flagged})
+    for item in scored:
+        flagged = sorted(
+            [(cat, s) for cat, s in item["scores"].items() if s >= threshold],
+            key=lambda pair: pair[1],
+            reverse=True,
+        )
+        output.append({"sentence": item["sentence"], "categories": flagged})
     return output
+
+
+def classify_sentences(classifier, sentences, threshold=THRESHOLD):
+    """Score and flag in one step."""
+    return apply_threshold(score_sentences(classifier, sentences), threshold)
 
 
 # ---------------------------------------------------------------------------
@@ -165,9 +198,9 @@ def summarize(classified):
 # ---------------------------------------------------------------------------
 # 8. Full analysis (used by app.py)
 # ---------------------------------------------------------------------------
-def analyze(text, classifier, threshold=THRESHOLD):
-    sentences = split_sentences(text)
-    classified = classify_sentences(classifier, sentences, threshold)
+def build_result(scored, threshold=THRESHOLD):
+    """Everything the app displays, built from saved scores (instant)."""
+    classified = apply_threshold(scored, threshold)
     score, level, found = risk_score(classified)
     return {
         "classified": classified,
@@ -175,9 +208,14 @@ def analyze(text, classifier, threshold=THRESHOLD):
         "max_score": MAX_SCORE,
         "level": level,
         "summary": summarize(classified),
-        "num_sentences": len(sentences),
+        "num_sentences": len(scored),
         "num_risky": sum(1 for c in classified if c["categories"]),
     }
+
+
+def analyze(text, classifier, threshold=THRESHOLD):
+    """Split, score and build the result in one call."""
+    return build_result(score_sentences(classifier, split_sentences(text)), threshold)
 
 
 # ---------------------------------------------------------------------------

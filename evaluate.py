@@ -1,9 +1,13 @@
 """
 evaluate.py - measures how accurate the classifier is.
 
-Run with:   python evaluate.py
+Run with:   python evaluate.py          (accurate model)
+            python evaluate.py fast     (fast model)
 Needs:      eval_data.csv with columns: sentence,true_label
 """
+
+import sys
+import time
 
 import pandas as pd
 from sklearn.metrics import (
@@ -14,13 +18,20 @@ from sklearn.metrics import (
     f1_score,
 )
 
-from analyzer import load_classifier, predict_labels
+from analyzer import MODELS, load_classifier, predict_labels
+
+fast = len(sys.argv) > 1 and sys.argv[1].lower() == "fast"
+model_label = list(MODELS.keys())[1 if fast else 0]
 
 df = pd.read_csv("eval_data.csv")
-print(f"Loaded {len(df)} labeled sentences.\nLoading model...")
+print(f"Loaded {len(df)} labeled sentences.\nLoading model: {model_label}")
 
-classifier = load_classifier()
+classifier = load_classifier(MODELS[model_label])
+start = time.time()
 df["pred_label"] = predict_labels(classifier, df["sentence"].tolist())
+elapsed = time.time() - start
+print(f"Classified {len(df)} sentences in {elapsed:.1f} s "
+      f"({elapsed / len(df):.2f} s per sentence)")
 
 # ---- 1. Per-category report ----
 print("\n=== Per-category results ===")

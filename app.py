@@ -10,7 +10,14 @@ from pathlib import Path
 import streamlit as st
 from pypdf import PdfReader
 
-from analyzer import THRESHOLD, analyze, load_classifier
+from analyzer import (
+    MODELS,
+    THRESHOLD,
+    build_result,
+    load_classifier,
+    score_sentences,
+    split_sentences,
+)
 
 BASE_DIR = Path(__file__).parent
 
@@ -62,8 +69,8 @@ st.markdown(
 # Load the model once and reuse it (Streamlit reruns the script on every click)
 # ---------------------------------------------------------------------------
 @st.cache_resource
-def get_classifier():
-    return load_classifier()
+def get_classifier(model_name):
+    return load_classifier(model_name)
 
 
 # ---------------------------------------------------------------------------
@@ -88,28 +95,56 @@ st.write(
 
 with st.sidebar:
     st.header("Settings")
+    model_label = st.radio(
+        "Model",
+        list(MODELS.keys()),
+        help="Fast is about 2-3x quicker with slightly lower accuracy. "
+             "Each model downloads once on first use.",
+    )
     threshold = st.slider(
         "Confidence threshold", 0.50, 0.95, THRESHOLD, 0.05,
-        help="Higher: fewer but more certain flags. Lower: catches more, with more false alarms.",
+        help="Higher: fewer but more certain flags. Lower: catches more, with more false alarms. "
+             "Changing it after an analysis updates the results instantly.",
     )
-    st.caption("Model: facebook/bart-large-mnli (zero-shot classification)")
 
 uploaded = st.file_uploader("Upload a policy (PDF or TXT)", type=["pdf", "txt"])
 pasted = st.text_area("Or paste the policy text", height=220)
 
 text = read_file(uploaded) if uploaded else pasted
 
+# Remember what was submitted, so moving the slider keeps the results on screen
 if st.button("Analyze", type="primary"):
     if not text.strip():
         st.warning("Upload a file or paste some text first.")
         st.stop()
+    st.session_state["submitted"] = {"text": text, "model": model_label}
 
-    with st.spinner("Analyzing. The first run downloads the model (about 1.6 GB)."):
-        result = analyze(text, get_classifier(), threshold)
+submitted = st.session_state.get("submitted")
 
-    if result["num_sentences"] == 0:
-        st.error("No readable sentences found. If this is a scanned PDF, it needs OCR.")
-        st.stop()
+if submitted:
+    # Model scores are saved per (model, text): the model runs only once per document.
+    # The threshold is applied afterwards, which needs no model and is instant.
+    cache = st.session_state.setdefault("score_cache", {})
+    key = (submitted["model"], submitted["text"])
+
+    if key not in cache:
+        sentences = split_sentences(submitted["text"])
+        if not sentences:
+            st.error("No readable sentences found. If this is a scanned PDF, it needs OCR.")
+            st.stop()
+
+        bar = st.progress(0.0, text="Loading the model. The first use downloads it.")
+        classifier = get_classifier(MODELS[submitted["model"]])
+
+        def update_progress(done, total):
+            bar.progress(done / total, text=f"Analyzed {done} of {total} sentences")
+
+        update_progress(0, len(sentences))
+        cache[key] = score_sentences(classifier, sentences, progress=update_progress)
+        bar.empty()
+
+    result = build_result(cache[key], threshold)
+    st.caption(f"Model: {submitted['model']}")
 
     # ---- Overview (all values are computed from this document) ----
     level = result["level"]
